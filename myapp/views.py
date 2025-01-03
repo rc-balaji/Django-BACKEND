@@ -17,7 +17,8 @@ from .models import (
 )
 import uuid
 import json
-from django.utils import timezone
+from datetime import datetime
+
 from django.shortcuts import get_object_or_404
 
 import pandas as pd
@@ -261,6 +262,7 @@ def dashboard_stats(request):
             # Fetch all users and topics from the database
             users = User.objects.all()
             topics = Topic.objects.all()
+            test_history_len = TestHistory.objects.all().count()
 
             if users is None or topics is None:
                 return JsonResponse(
@@ -275,10 +277,7 @@ def dashboard_stats(request):
                 role="subadmin"
             ).count()  # Count users with 'subadmin' role
             total_courses = topics.count()  # Total number of topics
-            total_tests_attempted = sum(
-                user.test_history.count() if hasattr(user, "test_history") else 0
-                for user in users
-            )  # Count total tests attempted by all users
+            # Count total tests attempted by all users
             active_users = (
                 10  # users.filter(is_active=True).count()  # Count active users
             )
@@ -289,7 +288,7 @@ def dashboard_stats(request):
                     "totalUsers": total_users,
                     "totalSubAdmins": total_subadmins,
                     "totalCourses": total_courses,
-                    "totalTestsAttempted": total_tests_attempted,
+                    "totalTestsAttempted": test_history_len,
                     "activeUsers": active_users,
                 }
             )
@@ -513,12 +512,21 @@ def add_topic(request):
             # Generate a unique topic ID
             topic_id = get_unique_id()
 
+            # Get current date and time
+            current_time = datetime.now()
+
+            # Format the date and time as "DD/MM/YYYY , HH/MM/SS"
+            formatted_time = str(current_time.strftime("%d/%m/%Y , %H/%M/%S"))
+
+            # Print the formatted time
+            print(formatted_time)
+
             # Create the new Topic entry
             new_topic = Topic.objects.create(
                 topic_id=topic_id,
                 name=topic_name,
                 created_by=user,
-                created_at=timezone.now().strftime("%Y-%m-%d %H:%M:%S"),
+                created_at=formatted_time,
             )
 
             # Prepare the response data
@@ -568,13 +576,22 @@ def add_subtopic(request, topic_id):
             # Generate unique subtopic ID
             subtopic_id = get_unique_id()
 
+            # Get current date and time
+            current_time = datetime.now()
+
+            # Format the date and time as "DD/MM/YYYY , HH/MM/SS"
+            formatted_time = str(current_time.strftime("%d/%m/%Y , %H/%M/%S"))
+
+            # Print the formatted time
+            print(formatted_time)
+
             # Create a new SubTopic entry in the database
             new_subtopic = SubTopic.objects.create(
                 subtopic_id=subtopic_id,
                 name=subtopic_name,
                 topic_id_id=topic.topic_id,
                 created_by_id=user_id,
-                created_at=str(timezone.now().strftime("%Y-%m-%d %H:%M:%S")),
+                created_at=formatted_time,
             )
 
             # Respond with the new subtopic details
