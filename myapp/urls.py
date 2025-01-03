@@ -41,4 +41,21 @@ urlpatterns = [
     path("users", views.get_users_by_role, name="get_users_by_role"),
     path("user-topics", views.get_user_topics, name="get_user_topics"),
     path("allocate", views.allocate_topics, name="allocate_topics"),
+    path(
+        "attempts/<str:user_id>/<str:title_id>",
+        views.get_attempts,
+        name="get_attempts",
+    ),
+    path(
+        "test-history/<str:user_id>",
+        views.get_test_history_by_user,
+        name="get_test_history_by_user",
+    ),
+    path(
+        "test-history/<str:user_id>/<str:test_id>",
+        views.get_test_history_by_user_and_test,
+        name="get_test_history_by_user_and_test",
+    ),
+    path("api/questions/count", views.get_question_count, name="get_question_count"),
+    path("save-result", views.finish_test, name="finish-test"),
 ]

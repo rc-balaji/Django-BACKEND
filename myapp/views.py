@@ -12,6 +12,8 @@ from .models import (
     TestQuestion,
     TestOption,
     UserTopic,
+    TestHistory,
+    Report,
 )
 import uuid
 import json
@@ -1475,3 +1477,264 @@ def allocate_topics(request):
         return JsonResponse(
             {"error": f"Failed to allocate topics: {str(e)}"}, status=500
         )
+
+
+def get_attempts(request, user_id, title_id):
+    try:
+        # Check if the user exists
+        if not User.objects.filter(user_id=user_id).exists():
+            return JsonResponse({"error": "User not found"}, status=404)
+
+        # Count the number of attempts for the given user_id and title_id
+        attempts = TestHistory.objects.filter(
+            user_id_id=user_id, title_id_id=title_id
+        ).count()
+
+        return JsonResponse({"attempts": attempts}, status=200)
+    except Exception as e:
+        return JsonResponse(
+            {"error": "Failed to retrieve attempts count", "details": str(e)},
+            status=500,
+        )
+
+
+def get_test_history_by_user(request, user_id):
+    try:
+        # Check if user exists
+        user = User.objects.filter(user_id=user_id).first()
+        if not user:
+            return JsonResponse({"error": "User not found"}, status=404)
+
+        # Retrieve all test history for the user
+        test_history = TestHistory.objects.filter(user_id=user)
+
+        print(test_history)
+
+        # Prepare the response with test history and associated reports
+        response_data = []
+        for history in test_history:
+            # print(history)
+            print(history.test_id)
+            report = Report.objects.filter(
+                test_id_id=history.test_id
+            ).all()  # Fetch all associated reports for the test
+            report_data = []
+
+            # print(report)
+
+            for idx, report_item in enumerate(report, 1):
+                # For each report, create a dictionary with the required fields
+
+                rep = report_item.report
+                report_data.append(rep)
+            # Append the test history along with report data
+            response_data.append(
+                {
+                    "test_id": history.test_id,
+                    "user_id": str(history.user_id.user_id),
+                    "topic_id": str(history.topic_id.topic_id),
+                    "subtopic_id": str(history.subtopic_id.subtopic_id),
+                    "title": history.title,
+                    "title_id": str(history.title_id.title_id),
+                    "type": history.type,
+                    "start_at": history.start_at,
+                    "finished_at": history.finished_at,
+                    "status": history.status,
+                    "score": history.score,
+                    "total_questions": history.total_question,
+                    "report": report_data,
+                }
+            )
+
+        return JsonResponse(response_data, safe=False, status=200)
+
+    except Exception as e:
+        return JsonResponse(
+            {"error": "Failed to retrieve test history", "details": str(e)}, status=500
+        )
+
+
+def get_test_history_by_user_and_test(request, user_id, test_id):
+    try:
+        # Check if user exists
+        user = User.objects.filter(user_id=user_id).first()
+        if not user:
+            return JsonResponse({"error": "User not found"}, status=404)
+
+        # Retrieve test history for the specific user and test
+        test_history = TestHistory.objects.filter(user_id=user, test_id=test_id).first()
+
+        if not test_history:
+            return JsonResponse(
+                {"error": "Test history not found for this user and test"}, status=404
+            )
+
+        # Prepare the response with test history and associated reports
+        report = Report.objects.filter(
+            test_id_id=test_history.test_id
+        ).all()  # Fetch all associated reports for the test
+        report_data = []
+
+        for idx, report_item in enumerate(report, 1):
+            # For each report, create a dictionary with the required fields
+            rep = report_item.report
+            report_data.append(rep)
+
+        # Prepare the final response data
+        response_data = {
+            "test_id": test_history.test_id,
+            "user_id": str(test_history.user_id.user_id),
+            "topic_id": str(test_history.topic_id.topic_id),
+            "subtopic_id": str(test_history.subtopic_id.subtopic_id),
+            "title": test_history.title,
+            "title_id": str(test_history.title_id.title_id),
+            "type": test_history.type,
+            "start_at": test_history.start_at,
+            "finished_at": test_history.finished_at,
+            "status": test_history.status,
+            "score": test_history.score,
+            "total_questions": test_history.total_question,
+            "report": report_data,
+        }
+
+        return JsonResponse(response_data, status=200)
+
+    except Exception as e:
+        return JsonResponse(
+            {"error": "Failed to retrieve test history", "details": str(e)}, status=500
+        )
+
+
+def get_question_count(request):
+    if request.method != "GET":
+        return JsonResponse({"error": "Invalid request method"}, status=405)
+
+    # Retrieve query parameters
+    topic_id = request.GET.get("topic_id")
+    subtopic_id = request.GET.get("subtopic_id")
+    title_id = request.GET.get("title_id")
+    util_type = request.GET.get("util_type")
+
+    print(request.GET)
+    print(topic_id, subtopic_id, title_id, util_type)
+
+    # Validate required parameters
+    if not all([topic_id, subtopic_id, title_id, util_type]):
+        return JsonResponse(
+            {"status": "error", "message": "Missing required parameters."}, status=400
+        )
+
+    try:
+        # Verify `title_id` in the respective model based on `util_type`
+        if util_type.lower() == "practice":
+            # Check if `title_id` exists in `Practice`
+            title = Practice.objects.filter(title_id=title_id).first()
+            if not title:
+                return JsonResponse(
+                    {"status": "error", "message": "Practice title not found."},
+                    status=404,
+                )
+
+            # Get the question count from `PracticeQuestion`
+            question_count = PracticeQuestion.objects.filter(title_id=title).count()
+
+        elif util_type.lower() == "test":
+            # Check if `title_id` exists in `Test`
+            title = Test.objects.filter(title_id=title_id).first()
+            if not title:
+                return JsonResponse(
+                    {"status": "error", "message": "Test title not found."}, status=404
+                )
+
+            # Get the question count from `TestQuestion`
+            question_count = TestQuestion.objects.filter(title_id=title).count()
+
+        else:
+            return JsonResponse(
+                {"status": "error", "message": "Invalid utility type."}, status=400
+            )
+
+        # Return the question count
+        return JsonResponse(
+            {"status": "success", "question_count": question_count}, status=200
+        )
+
+    except Exception as e:
+        print("------", e)
+        return JsonResponse(
+            {"status": "error", "message": f"An error occurred: {str(e)}"}, status=500
+        )
+
+
+def finish_test(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Invalid request method"}, status=405)
+
+    try:
+        # Parse the incoming JSON payload
+        payload = json.loads(request.body)
+
+        # Extract data from the payload
+        user_id = payload.get("user_id")
+        topic_id = payload.get("topic_id")
+        subtopic_id = payload.get("subtopic_id")
+        title_id = payload.get("title_id")
+        type = payload.get("type")
+        title = payload.get("title")
+        start_at = payload.get("start_at")
+        finished_at = payload.get("finished_at")
+        status = payload.get("status")
+        score = payload.get("score")
+        total_questions = payload.get("total_questions")
+        report_data = payload.get("report", [])
+
+        # Validate required fields
+        if not all([user_id, topic_id, subtopic_id, title_id, type, title]):
+            return JsonResponse(
+                {"error": "Missing required fields in payload"}, status=400
+            )
+
+        # Fetch related objects
+        user = User.objects.filter(user_id=user_id).first()
+        topic = Topic.objects.filter(topic_id=topic_id).first()
+        subtopic = SubTopic.objects.filter(subtopic_id=subtopic_id).first()
+        test = Test.objects.filter(title_id=title_id).first()
+
+        if not all([user, topic, subtopic, test]):
+            return JsonResponse(
+                {"error": "Invalid references for user, topic, subtopic, or test"},
+                status=404,
+            )
+
+        # Create a new TestHistory entry
+
+        test_u_id = str(uuid.uuid4())
+        test_history = TestHistory.objects.create(
+            test_id=test_u_id,
+            user_id=user,
+            topic_id=topic,
+            subtopic_id=subtopic,
+            title_id=test,
+            type=type,
+            title=title,
+            start_at=start_at,
+            finished_at=finished_at,
+            status=status,
+            score=score,
+            total_question=total_questions,
+        )
+
+        # Save reports
+        for report_item in report_data:
+            Report.objects.create(
+                test_id=test_history,
+                report=report_item,
+            )
+
+        return JsonResponse(
+            {"message": "Test finished successfully", "testID": test_u_id},
+            status=200,
+        )
+
+    except Exception as e:
+        return JsonResponse({"error": f"An error occurred: {str(e)}"}, status=500)
