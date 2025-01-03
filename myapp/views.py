@@ -868,9 +868,12 @@ def organize_subtopic(request, topic_id, subtopic_id):
             return JsonResponse({"error": str(e)}, status=500)
 
     elif request.method == "POST":
+        print("CALLEDPOST")
         try:
             # Retrieve data from the request body
-            name = request.POST.get("name")
+
+            body = get_body_data(request)
+            name = body.get("name")
 
             if not name:
                 return JsonResponse({"error": "Name is required"}, status=400)
@@ -1185,6 +1188,8 @@ from django.core.files.storage import FileSystemStorage
 
 
 def add_questions_import(request):
+    print("CALEED")
+
     if request.method == "POST":
         try:
             # Handle file upload
@@ -1755,3 +1760,174 @@ def finish_test(request):
 
     except Exception as e:
         return JsonResponse({"error": f"An error occurred: {str(e)}"}, status=500)
+
+
+def organize_title(request, id):
+    if request.method == "PUT":
+        try:
+            # Parse the request body
+            body = json.loads(request.body)
+            topic_id = body.get("topic_id")
+            subtopic_id = body.get("subtopic_id")
+            title_type = body.get("type")  # "Practices" or "Test"
+            new_title = body.get("newTitle")
+
+            if not topic_id or not subtopic_id or not title_type or not new_title:
+                return JsonResponse({"error": "Missing required fields"}, status=400)
+
+            # Check the type and update the respective model
+            if title_type == "Practices":
+                title = Practice.objects.filter(
+                    title_id=id, topic_id=topic_id, subtopic_id=subtopic_id
+                ).first()
+            elif title_type == "Test":
+                title = Test.objects.filter(
+                    title_id=id, topic_id=topic_id, subtopic_id=subtopic_id
+                ).first()
+            else:
+                return JsonResponse({"error": "Invalid type specified"}, status=400)
+
+            if not title:
+                return JsonResponse({"error": "Title not found"}, status=404)
+
+            # Update the title
+            title.title = new_title
+            title.save()
+
+            return JsonResponse(
+                {
+                    "message": "Title updated successfully",
+                    "title": {"title_id": title.title_id, "title": title.title},
+                }
+            )
+        except Exception as e:
+            return JsonResponse(
+                {"error": "Failed to update title", "details": str(e)}, status=500
+            )
+    if request.method == "DELETE":
+        try:
+            # Get query parameters
+            topic_id = request.GET.get("topic_id")
+            subtopic_id = request.GET.get("subtopic_id")
+            title_type = request.GET.get("type")  # "Practices" or "Test"
+
+            if not topic_id or not subtopic_id or not title_type:
+                return JsonResponse(
+                    {"error": "Missing required query parameters"}, status=400
+                )
+
+            # Check the type and delete the respective model
+            if title_type == "Practices":
+                title = Practice.objects.filter(
+                    title_id=id, topic_id=topic_id, subtopic_id=subtopic_id
+                ).first()
+            elif title_type == "Test":
+                title = Test.objects.filter(
+                    title_id=id, topic_id=topic_id, subtopic_id=subtopic_id
+                ).first()
+            else:
+                return JsonResponse({"error": "Invalid type specified"}, status=400)
+
+            if not title:
+                return JsonResponse({"error": "Title not found"}, status=404)
+
+            # Delete the title
+            title.delete()
+
+            return JsonResponse({"message": "Title deleted successfully"})
+        except Exception as e:
+            return JsonResponse(
+                {"error": "Failed to delete title", "details": str(e)}, status=500
+            )
+    return JsonResponse({"error": "Invalid request method"}, status=405)
+
+
+def update_question(request):
+    if request.method == "POST":
+        data = json.loads(request.body)
+        question_id = data.get("question_id")
+        title_id = data.get("title_id")
+        question_text = data.get("question")
+        correct_option = data.get("correct_option")
+        explanation = data.get("explanation")
+        options = data.get("options")  # Assuming options is a list of four strings
+        question_type = data.get("type")  # "Practice" or "Test"
+
+        # Fetch the question based on type
+        if question_type == "Practice":
+            question = get_object_or_404(
+                PracticeQuestion, question_id=question_id, title_id=title_id
+            )
+            option_model = PracticeOption
+        elif question_type == "Test":
+            question = get_object_or_404(
+                TestQuestion, question_id=question_id, title_id=title_id
+            )
+            option_model = TestOption
+        else:
+            return JsonResponse({"error": "Invalid type specified"}, status=400)
+
+        # Update question details
+        question.question = question_text
+        question.correct_option = correct_option
+        question.explanation = explanation
+        question.save()
+
+        # Update options
+        options_obj = get_object_or_404(option_model, question_id=question)
+        options_obj.option1 = options[0]
+        options_obj.option2 = options[1]
+        options_obj.option3 = options[2]
+        options_obj.option4 = options[3]
+        options_obj.save()
+
+        return JsonResponse(
+            {
+                "message": "Question updated successfully",
+                "updated_question": {
+                    "question_id": question.question_id,
+                    "question": question.question,
+                    "correct_option": question.correct_option,
+                    "explanation": question.explanation,
+                    "options": [
+                        options_obj.option1,
+                        options_obj.option2,
+                        options_obj.option3,
+                        options_obj.option4,
+                    ],
+                },
+            },
+            status=200,
+        )
+    return JsonResponse({"error": "Invalid HTTP method"}, status=405)
+
+
+def delete_question(request):
+    if request.method == "DELETE":
+        data = json.loads(request.body)
+        question_id = data.get("question_id")
+        title_id = data.get("title_id")
+        question_type = data.get("type")  # "Practice" or "Test"
+
+        # Fetch and delete the question based on type
+        if question_type == "Practice":
+            question = get_object_or_404(
+                PracticeQuestion, question_id=question_id, title_id=title_id
+            )
+            option_model = PracticeOption
+        elif question_type == "Test":
+            question = get_object_or_404(
+                TestQuestion, question_id=question_id, title_id=title_id
+            )
+            option_model = TestOption
+        else:
+            return JsonResponse({"error": "Invalid type specified"}, status=400)
+
+        # Delete associated options
+        option_model.objects.filter(question_id=question).delete()
+
+        # Delete the question
+        question.delete()
+
+        return JsonResponse({"message": "Question deleted successfully"}, status=200)
+    return JsonResponse({"error": "Invalid HTTP method"}, status=405)

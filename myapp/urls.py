@@ -58,4 +58,7 @@ urlpatterns = [
     ),
     path("api/questions/count", views.get_question_count, name="get_question_count"),
     path("save-result", views.finish_test, name="finish-test"),
+    path("title/<str:id>", views.organize_title, name="organize-title"),
+    path("update/questions", views.update_question, name="update_question"),
+    path("delete/questions", views.delete_question, name="delete_question"),
 ]
